@@ -1,0 +1,9 @@
+/test_run
+/test_pi
+/sounds
+/.vscode
+
+schedule.json
+templates.json
+requirements.txt
+manager_config.json

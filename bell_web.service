@@ -1,0 +1,15 @@
+[Unit]
+Description=Bell Scheduler Web Interface
+After=network.target bell_scheduler.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/bell_scheduler
+ExecStart=/usr/bin/python3 /home/pi/bell_scheduler/web_server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

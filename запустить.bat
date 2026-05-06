@@ -1,0 +1,6 @@
+@echo off
+echo Установка зависимостей...
+pip install -r requirements.txt --quiet
+echo Запуск Bell Scheduler Manager...
+python bell_manager.py
+pause

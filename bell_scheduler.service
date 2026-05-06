@@ -1,0 +1,22 @@
+[Unit]
+Description=Bell Scheduler — автоматические звонки на пары
+After=network.target sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/bell_scheduler
+ExecStart=/usr/bin/python3 /home/pi/bell_scheduler/bell_scheduler.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/pi/bell_scheduler/logs/service.log
+StandardError=append:/home/pi/bell_scheduler/logs/service.log
+
+# Переменная окружения для вывода аудио через ALSA (AUX / HDMI)
+# 0 = авто, 1 = AUX (3.5mm джек), 2 = HDMI
+Environment=AUDIODEV=hw:0,0
+
+[Install]
+WantedBy=multi-user.target
