@@ -43,7 +43,7 @@ if args.help:
     sys.exit(0)
 
 TEST_MODE  = args.test
-TIME_SPEED = args.speed   # 1 реальная секунда = N виртуальных секунд
+TIME_SPEED = args.speed 
 
 # ─────────────────────────────────────────
 #  ПУТИ — боевые или тестовые
@@ -51,13 +51,12 @@ TIME_SPEED = args.speed   # 1 реальная секунда = N виртуал
 _script_dir = Path(__file__).parent
 
 if TEST_MODE:
-    # Всё рядом со скриптом, в папке test_run/
     BASE_DIR = _script_dir / "test_run"
 else:
     BASE_DIR = Path("/home/pi/bell_scheduler")
 
-SCHEDULE_FILE = _script_dir / "schedule.json"    # общий для обоих режимов
-SOUNDS_DIR    = _script_dir / "sounds"           # общий для обоих режимов
+SCHEDULE_FILE = _script_dir / "schedule.json"    
+SOUNDS_DIR    = _script_dir / "sounds"           
 LOG_FILE      = BASE_DIR / "logs" / "bells.log"
 CONTROL_FILE  = BASE_DIR / "control.cmd"
 STATUS_FILE   = BASE_DIR / "status.json"
@@ -72,7 +71,7 @@ _test_start_real = time.time()
 _test_start_virt = datetime.now().replace(second=0, microsecond=0)
 
 def virtual_now() -> datetime:
-    """Возвращает ускоренное время в тесте, реальное — в боевом."""
+    
     if not TEST_MODE:
         return datetime.now()
     elapsed_real = time.time() - _test_start_real
@@ -143,14 +142,11 @@ def should_ring(task: dict, current_time: str, current_day: str) -> bool:
 # ══════════════════════════════════════════
 
 def _beep_pygame(label: str = ""):
-    """
-    Генерирует тоновый сигнал через pygame + numpy.
-    Используется в тесте когда нет реального файла.
-    """
+
     try:
         import numpy as np
         import pygame
-        # Если уже инициализирован — закрываем и открываем заново с нужными параметрами
+        
         if pygame.mixer.get_init():
             pygame.mixer.quit()
         pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
@@ -159,7 +155,6 @@ def _beep_pygame(label: str = ""):
         freq = 880.0
         t    = np.linspace(0, dur, int(rate * dur), endpoint=False)
         mono = (np.sin(2 * np.pi * freq * t) * 32767 * 0.6).astype(np.int16)
-        # Стерео: дублируем канал (форма: [samples, 2])
         stereo = np.column_stack((mono, mono))
         pygame.sndarray.make_sound(stereo).play()
         logging.info(f"🔔 [ТЕСТ] Тон 880 Гц, 1.5 сек  ({label})")
@@ -173,10 +168,6 @@ def _beep_pygame(label: str = ""):
 
 
 def play_sound(sound_file: str, duration: int = 0) -> bool:
-    """
-    Воспроизводит звуковой файл.
-    duration — максимальная длина в секундах (0 = полный файл).
-    """
     sound_path = SOUNDS_DIR / sound_file
 
     # ── Файл не найден ─────────────────────────────
@@ -191,7 +182,7 @@ def play_sound(sound_file: str, duration: int = 0) -> bool:
     dur_str = f" (макс. {duration}с)" if duration else ""
     logging.info(f"▶  Воспроизведение: {sound_file}{dur_str}")
 
-    # ── Тестовый режим → только pygame ─────────────
+    # ── Тестовый режим ─────────────
     if TEST_MODE:
         try:
             import pygame
@@ -218,7 +209,7 @@ def play_sound(sound_file: str, duration: int = 0) -> bool:
             logging.error(f"❌ pygame: {e}")
             return False
 
-    # ── Боевой режим → mpg123 / aplay ─────────────
+    # ── Боевой режим─────────────
     ext = sound_path.suffix.lower()
     if ext == ".mp3":
         cmd = ["mpg123", "-q", str(sound_path)]
@@ -234,7 +225,7 @@ def play_sound(sound_file: str, duration: int = 0) -> bool:
         state["current_process"] = proc
 
         if duration:
-            # Ждём duration секунд, потом принудительно останавливаем
+            
             deadline = time.time() + duration
             while proc.poll() is None:
                 if time.time() >= deadline:

@@ -20,7 +20,7 @@ from werkzeug.utils import secure_filename
 # ═══════════════════════════════════════════════════
 #  КОНФИГУРАЦИЯ
 # ═══════════════════════════════════════════════════
-BASE_DIR       = Path("/home/pi/bell_scheduler")
+BASE_DIR       = Path(r"C:\PROJECTS_PYTHON\AUTOALARM")
 SOUNDS_DIR     = BASE_DIR / "sounds"
 SCHEDULE_FILE  = BASE_DIR / "schedule.json"
 TEMPLATES_FILE = BASE_DIR / "templates.json"
@@ -28,8 +28,8 @@ STATUS_FILE    = BASE_DIR / "status.json"
 CONTROL_FILE   = BASE_DIR / "control.cmd"
 LOG_FILE       = BASE_DIR / "logs" / "bells.log"
 
-WEB_PASSWORD   = "qwerty12Q"   # ← поменяй пароль здесь
-SECRET_KEY     = "bell_scheduler_secret_2024"
+WEB_PASSWORD   = "qwerty"   # ← поменяй пароль здесь
+SECRET_KEY     = "super secret key"
 PORT           = 5000
 MAX_SOUND_MB   = 20
 ALLOWED_EXT    = {".mp3", ".wav", ".ogg"}
@@ -100,9 +100,7 @@ def api_log():
 @app.route("/api/log/stream")
 @login_required
 def api_log_stream():
-    """SSE — толкает новые строки лога в браузер сразу как они появляются."""
     def generate():
-        # Сначала отдаём последние 50 строк
         try:
             if LOG_FILE.exists():
                 lines = LOG_FILE.read_text(encoding="utf-8").splitlines()
@@ -111,16 +109,14 @@ def api_log_stream():
         except Exception:
             pass
 
-        # Затем следим за файлом как tail -f
         try:
             with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
-                f.seek(0, 2)  # в конец файла
+                f.seek(0, 2) 
                 while True:
                     line = f.readline()
                     if line:
                         yield f"data: {line.rstrip()}\n\n"
                     else:
-                        # Пингуем каждые 2 сек чтобы соединение не закрылось
                         yield ": ping\n\n"
                         time.sleep(2)
         except GeneratorExit:
@@ -133,7 +129,7 @@ def api_log_stream():
         mimetype="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",   # отключает буферизацию nginx если стоит
+            "X-Accel-Buffering": "no",  
         }
     )
 
@@ -184,7 +180,6 @@ def api_templates_save():
 @app.route("/api/apply_template", methods=["POST"])
 @login_required
 def api_apply_template():
-    """Применить шаблон — сформировать schedule.json и перезагрузить расписание."""
     try:
         data        = request.json
         template    = data["template"]
@@ -193,7 +188,6 @@ def api_apply_template():
 
         bells = []
         for b in template["bells"]:
-            # Если у звонка своя мелодия — используем её, иначе общую
             sound = b.get("sound") or (melody_start if b["type"] == "start" else melody_end)
             bells.append({
                 "id":          b["id"],
@@ -370,6 +364,7 @@ MAIN_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Управление звонками</title>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Mulish:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -469,6 +464,7 @@ label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
 /* ── КНОПКИ УПРАВЛЕНИЯ ── */
 .ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .ctrl-btn{padding:13px;font-size:13px;justify-content:center;width:100%}
+.ctrl-btn.active{background:var(--accentbg);color:var(--accent);border-color:var(--accent)}
 
 /* ── ШАБЛОНЫ ── */
 .tmpl-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;
@@ -626,15 +622,21 @@ label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
     <div class="card">
       <div class="card-title">Управление</div>
       <div class="ctrl-grid">
-        <button class="btn btn-ghost ctrl-btn" onclick="sendCmd('pause')">Пауза</button>
-        <button class="btn btn-ghost ctrl-btn" onclick="sendCmd('resume')">Снять паузу</button>
-        <button class="btn btn-ghost ctrl-btn" onclick="sendCmd('stop_sound')">Стоп звонка</button>
-        <button class="btn btn-ghost ctrl-btn" onclick="sendCmd('reload')">Перезагр. расп.</button>
+        <button class="btn btn-ghost ctrl-btn" id="pause-btn" onclick="togglePause()">
+          <i data-feather="pause" style="width:15px;height:15px"></i> Пауза
+        </button>
+        <button class="btn btn-ghost ctrl-btn" onclick="sendCmd('stop_sound')">
+          <i data-feather="square" style="width:15px;height:15px"></i> Стоп звонка
+        </button>
+        <button class="btn btn-ghost ctrl-btn" onclick="sendCmd('reload')">
+          <i data-feather="refresh-cw" style="width:15px;height:15px"></i> Перезагр. расп.
+        </button>
+        <button class="btn btn-ghost ctrl-btn" onclick="sendCmd('restart')">
+          <i data-feather="power" style="width:15px;height:15px"></i> Рестарт сервиса
+        </button>
       </div>
-      <button class="btn btn-ghost" style="width:100%" onclick="sendCmd('restart')">Рестарт сервиса</button>
     </div>
   </div>
-
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div class="card-title" style="margin:0">Лог событий</div>
@@ -886,9 +888,11 @@ async function loadStatus(){
     }
 
     document.getElementById('s-running').innerHTML =
-      s.running ? '<span class="val-green">✅ Работает</span>' : '<span class="val-red">🔴 Остановлен</span>';
+      s.running ? '<span class="val-green">Работает</span>' : '<span class="val-red">Остановлен</span>';
     document.getElementById('s-paused').innerHTML =
-      s.paused  ? '<span class="val-yellow">⏸ Пауза</span>'   : '<span class="val-green">▶ Активен</span>';
+      s.paused  ? '<span class="val-yellow">На паузе</span>'   : '<span class="val-green">Активен</span>';
+
+    updatePauseBtn(!!s.paused);
 
     const lr = s.last_ring;
     if(lr){
@@ -942,12 +946,37 @@ function escHtml(s){
 // ════════════════════════════════════════
 //  УПРАВЛЕНИЕ
 // ════════════════════════════════════════
+let _isPaused = false;
+
+function updatePauseBtn(paused){
+  _isPaused = paused;
+  const btn = document.getElementById('pause-btn');
+  if(!btn) return;
+  if(paused){
+    btn.innerHTML = '<i data-feather="play" style="width:15px;height:15px"></i> Снять паузу';
+    btn.classList.add('active');
+  } else {
+    btn.innerHTML = '<i data-feather="pause" style="width:15px;height:15px"></i> Пауза';
+    btn.classList.remove('active');
+  }
+  feather.replace();
+}
+
+async function togglePause(){
+  const cmd = _isPaused ? 'resume' : 'pause';
+  const r = await api('/api/command',{method:'POST',body:JSON.stringify({cmd})});
+  if(r.ok){
+    updatePauseBtn(!_isPaused);
+    toast(_isPaused ? 'Пауза снята' : 'Система на паузе');
+  } else toast('Ошибка: '+r.error, false);
+}
+
 async function sendCmd(cmd){
-  const labels = {pause:'Пауза',resume:'Снята пауза',stop_sound:'Стоп звонка',
+  const labels = {stop_sound:'Звонок остановлен',
     reload:'Расписание перезагружено',restart:'Сервис перезапускается...'};
   const r = await api('/api/command',{method:'POST',body:JSON.stringify({cmd})});
-  if(r.ok){ toast('✅ '+labels[cmd]); setTimeout(loadStatus,1500); }
-  else toast('❌ '+r.error, false);
+  if(r.ok){ toast(labels[cmd]||cmd); setTimeout(loadStatus,1500); }
+  else toast('Ошибка: '+r.error, false);
 }
 
 // ════════════════════════════════════════
@@ -1435,12 +1464,13 @@ async function saveTrim(){
 }
 async function init(){
   await loadStatus();
-  initLogStream();   // SSE — мгновенный лог, без поллинга
+  initLogStream();
   await loadTemplates();
   await loadSounds();
+  feather.replace();
 }
 
-setInterval(loadStatus, 10000);  // статус каждые 10 сек
+setInterval(loadStatus, 10000);
 init();
 </script>
 </body>
